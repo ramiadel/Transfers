@@ -1,0 +1,509 @@
+/SCRATCH/nsim-rv/Tools/nsim/main/dev/inc/sys/mod/cpu/ext/VecFpuExtensionDWFC.h
+1 CONFLICT 
+
+<<<<<<< HEAD
+   * Templated helper function that gives the right sized QNaN
+   * @tparam T - type used
+   */
+  template<typename T>
+  T GetQNaN();
+
+  // FFmax helper functor for FFMaxMin
+  template<typename T>
+  class FmaxS;
+  // FFmin Helper functor for FFMaxMin
+  template<typename T>
+  class FminS;
+
+  /**
+=======
+>>>>>>> origin/develop
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/SCRATCH/nsim-rv/Tools/nsim/main/dev/inc/sys/mod/cpu/exu/arc/vec/VectorExecutionEngine-inl.h
+1 CONFLICT 
+<<<<<<< HEAD
+
+template<typename T>
+T GetQNaN() {
+  uint16 FP16QNaN = 0x7E00;
+  uint32 FP32QNaN = 0x7FC00000;
+  return is_same<T, uint16>() ? FP16QNaN : FP32QNaN;
+}
+=======
+template<typename T>
+T GetQNaN(const Context& C) {
+  return is_same<T, uint16>() ? C.FPU->GetQNaN16() : C.FPU->GetQNaN32();
+}
+
+>>>>>>> origin/develop
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/SCRATCH/nsim-rv/Tools/nsim/main/dev/inc/uarch/processor/ProcessorPipelineHS4X.h
+2 CONFLICTS
+
+<<<<<<< HEAD
+
+  // Per-instruction state, set/used at appropriate pipe stages
+  template <typename T> using DualPipe = std::array<T, 2>;
+  DualPipe<uint32> dst1_stage_def;  // availability stage of dst1 per inst
+  uint64       dst1_avail_cyc;     // post-commit time for dst1 result
+  uint32       flag_stage_def;     // stage defining pre-commit flags
+  uint64       flag_avail;         // flag availability time
+  uint64       flag_avail_cyc;     // post-commit flag availability time
+=======
+  // -- EXU (dual-issue) STATE
+  common::state::MultiIssuePipelineUnitState<> exu;
+>>>>>>> origin/develop
+
+
+<<<<<<< HEAD
+  DualPipe<bool>  uses_bypass;    // indicates if inst produced result that may
+                                  // use the bypass mechanism. This entails that
+                                  // an inst that retires post-commit will never
+                                  // set this property.
+  DualPipe<bool>  uses_flags;     // true if instruction requires ZNCV flags
+  DualPipe<bool>  uses_alu;       // indicates if instruction uses an ALU
+=======
+>>>>>>> origin/develop
+
+
+
+
+
+
+
+
+/SCRATCH/nsim-rv/Tools/nsim/main/dev/inc/uarch/processor/ProcessorPipelineHS6X.h
+1 CONFLICT 
+
+<<<<<<< HEAD
+  // Per-instruction state, set/used at appropriate pipe stages
+  template <typename T> using DualPipe = std::array<T, 2>;
+  DualPipe<uint32> dst1_stage_def;  // availability stage of dst1 per inst
+  Time       dst1_avail_cyc;      // post-commit time for dst1 result
+  Time       flag_stage_def;      // stage defining pre-commit flags
+  Time       flag_avail;          // flag availability time
+  Time       flag_avail_cyc;      // post-commit flag availability time
+
+  Time       br_penalty;          // penalty of a branch mis-prediction
+  Time       mem_penalty;         // cost of memory ops in this inst
+  DualPipe<bool>  uses_bypass;    // indicates if inst produced result that may
+                                  // use the bypass mechanism. This entails that
+                                  // an inst that retires post-commit will never
+                                  // set this property.
+  DualPipe<bool>  uses_flags;     // true if instruction requires ZNCV flags
+  DualPipe<bool>  uses_alu;       // indicates if instruction uses an ALU
+=======
+  Time       br_penalty;          // penalty of a branch mis-prediction
+  Time       mem_penalty;         // cost of memory ops in this inst
+>>>>>>> origin/develop
+
+
+
+
+
+
+
+
+
+/SCRATCH/nsim-rv/Tools/nsim/main/dev/src/sys/mod/cpu/ext/VecFpuExtensionDWFC.cpp
+4 CONFLIITS 
+
+<<<<<<< HEAD
+    } else {
+=======
+    } else if (!ExtractBit<uint64>(z_int, STS_OUT_INVLD_POS)) {
+>>>>>>> origin/develop
+      if (op_sub) {
+        z_int |= (1ull << (FFP_SIZEO -1));
+      } else {
+        z_int &= ~(1ull << (FFP_SIZEO -1) );
+      }
+    }
+    return z_int;
+  }
+
+
+<<<<<<< HEAD
+// Helper function for FFMaxMin;
+template<typename T>
+struct VecFpuExtensionDWFC::FmaxS {
+  T operator()(VecFpuExtensionDWFC *V, T a, T b) {
+    return V->FMax(a, b);
+  }
+};
+
+// Helper function for FFMaxMin;
+template<typename T>
+struct VecFpuExtensionDWFC::FminS {
+  T operator()(VecFpuExtensionDWFC *V, T a, T b) {
+    return V->FMin(a, b);
+  }
+};
+
+
+template<typename T, template<typename> class Operand>
+uint64 VecFpuExtensionDWFC::FFMaxMin(std::vector<T> vec) {
+  T result = is_same<uint32, T>::value ? static_cast<T>(kFP32QNaN) : kFP16QNaN;
+  std::vector<T> r;
+  for (T elem : vec) {
+    r.push_back(elem);
+  }
+  Operand<T> op;
+  for (uint32 E = vec.size(); E != 1; E /= 2) {
+    for (uint32 I = 0; I != E; I += 2) {
+        r[I/2] = op(this, r[I+1], r[I]);
+    }
+  }
+  if (vec.size() != 0) {
+    result = r[0];
+  }
+  SupressInvalid(vec);
+  InstructionPostamble();
+  return result;
+}
+
+uint16 VecFpuExtensionDWFC::FFMax(const std::vector<uint16>& vec) {
+  return FFMaxMin<uint16, FmaxS>(vec);
+}
+
+uint16 VecFpuExtensionDWFC::FFMin(const std::vector<uint16>& vec) {
+  return FFMaxMin<uint16, FminS>(vec);
+=======
+uint16 VecFpuExtensionDWFC::FFMax(std::vector<uint16>* vec) {
+  return FFMaxMin<uint16, kGreaterThanOrEqualTo>(vec);
+}
+
+uint16 VecFpuExtensionDWFC::FFMin(std::vector<uint16>* vec) {
+  return FFMaxMin<uint16, kLessThanOrEqualTo>(vec);
+>>>>>>> origin/develop
+}
+
+<<<<<<< HEAD
+uint32 VecFpuExtensionDWFC::FMin(uint32 src1, uint32 src2) {
+  if (impl::FIsAnyNan(src1) && impl::FIsAnyNan(src2)) {
+    return kFP32QNaN;
+  } else if (impl::FIsAnyNan(src1)) {
+    return src2;
+  } else if (impl::FIsAnyNan(src2)) {
+    return src1;
+  }
+  uint64 ctrl = 0;
+  uint64 z0, z1;
+  uint64 status0, status1;
+  bool eq, lt, gt, unordered;
+  DWFC_fp_cmp32.implement(src1, src2,
+                          ctrl, &eq, &lt, &gt, &unordered,
+                          CAST(&z0), CAST(&z1), CAST(&status0), CAST(&status1));
+  return lt || eq ? src1 : src2;
+}
+
+uint32 VecFpuExtensionDWFC::FMax(uint32 src1, uint32 src2) {
+  if (impl::FIsAnyNan(src1) && impl::FIsAnyNan(src2)) {
+    return kFP32QNaN;
+  } else if (impl::FIsAnyNan(src1)) {
+    return src2;
+  } else if (impl::FIsAnyNan(src2)) {
+    return src1;
+  }
+  uint64 ctrl = 0;
+  uint64 z0, z1;
+  uint64 status0, status1;
+  bool eq, lt, gt, unordered;
+  DWFC_fp_cmp32.implement(src1, src2,
+                          ctrl, &eq, &lt, &gt, &unordered,
+                          CAST(&z0), CAST(&z1), CAST(&status0), CAST(&status1));
+  return gt || eq ? src1 : src2;
+=======
+uint32 VecFpuExtensionDWFC::FMax(uint32 src1, uint32 src2) {
+  return FMaxMin<uint32, kGreaterThan>(src1, src2);
+}
+
+uint32 VecFpuExtensionDWFC::FMin(uint32 src1, uint32 src2) {
+  return FMaxMin<uint32, kLessThan>(src1, src2);
+>>>>>>> origin/develop
+
+
+
+<<<<<<< HEAD
+uint32 VecFpuExtensionDWFC::FFMax(const std::vector<uint32>& vec) {
+  return FFMaxMin<uint32, FmaxS>(vec);
+}
+
+uint32 VecFpuExtensionDWFC::FFMin(const std::vector<uint32>& vec) {
+  return FFMaxMin<uint32, FminS>(vec);
+=======
+uint32 VecFpuExtensionDWFC::FFMax(std::vector<uint32>* vec) {
+  return FFMaxMin<uint32, kGreaterThanOrEqualTo>(vec);
+}
+
+uint32 VecFpuExtensionDWFC::FFMin(std::vector<uint32>* vec) {
+  return FFMaxMin<uint32, kLessThanOrEqualTo>(vec);
+>>>>>>> origin/develop
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SCRATCH/nsim-rv/Tools/nsim/main/dev/src/sys/mod/xdma/StuV6.cpp
+1 CONFLICT 
+
+
+<<<<<<< HEAD
+      if (Logger::Is<Logger::kDebug3>()) {
+        const uint32 n_bytes = Min(size + excess_bytes, 48u);  // limit n_bytes to print
+=======
+      if (Logger::Is<Logger::kDebug3>() && (size > 0)) {
+        const uint32 n_bytes = Min(size, 48u);  // limit n_bytes to print
+>>>>>>> origin/develop
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/SCRATCH/nsim-rv/Tools/nsim/main/dev/src/uarch/processor/ProcessorPipelineHS4X.cpp
+1 CONFLICT
+<<<<<<< HEAD
+  // ---------------------------------------------------------------------------
+  // ANALYZE THE DUAL-ISSUE STATUS OF THE CURRENT INSTRUCTION
+  //
+  if (!inst->IsDualIssueBundle()        // -- SINGLE ISSUE
+      || (inst->IsDualIssueHead()       // -- SINGLE ISSUE DUE TO BEING HEAD
+          && bpu.IsLoopBack(cpu.state, *inst))) {  //    THAT LOOPS BACK
+    dst1_stage_def.fill(0);
+  } else {                              // -- DUAL ISSUE OR PART THEREOF
+    if (inst->IsDualIssueHead()) {
+      is_head = true;
+      tail    = inst->GetDualIssueTail();
+      // NOTE: BUNDLING LOGIC MUST NOT BUNDLE PIPELINE FLUSHING INSTRUCTIONS
+      ASSERT(!tail->IsPipelineFlushInst());
+      dst1_stage_def.fill(0);
+    } else {
+      is_tail     = true;
+      inum        = 1;
+      dst1_stage_def[inum] = 0;
+    }
+  }
+
+  dst1_avail_cyc   = 0;
+  // Set default values for state that is not duplicated in a dispatch packet.
+  flag_stage_def   = 0;
+=======
+  exu.Init(*inst, bpu.IsLoopBack(cpu.state, *inst));
+  if (exu.IsHead()) {
+    tail    = inst->GetDualIssueTail();
+    // NOTE: BUNDLING LOGIC MUST NOT BUNDLE PIPELINE FLUSHING INSTRUCTIONS
+    ASSERT(!tail->IsPipelineFlushInst());
+  }
+
+>>>>>>> origin/develop
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/SCRATCH/nsim-rv/Tools/nsim/main/dev/src/uarch/processor/ProcessorPipelineHS6X.cpp
+1 CONFLICT
+<<<<<<< HEAD
+  // ---------------------------------------------------------------------------
+  // ANALYZE THE DUAL-ISSUE STATUS OF THE CURRENT INSTRUCTION
+  //
+  if (!inst->IsDualIssueBundle()        // -- SINGLE ISSUE
+      || (kIsRelaxedBranchDispatchEnabled
+          && inst->SerializeDualIssueBundle(ctx.Is<Property::kTakenBranch>()))
+      || (inst->IsDualIssueHead()       // -- SINGLE ISSUE DUE TO BEING HEAD
+          && bpu.IsLoopBack(cpu.state, *inst))) {  //    THAT LOOPS BACK
+    dst1_stage_def.fill(0);
+  } else {                              // -- DUAL ISSUE OR PART THEREOF
+    if (inst->IsDualIssueHead()) {
+      is_head = true;
+      tail    = inst->GetDualIssueTail();
+      // NOTE: BUNDLING LOGIC MUST NOT BUNDLE PIPELINE FLUSHING INSTRUCTIONS
+      ASSERT(!tail->IsPipelineFlushInst());
+      dst1_stage_def.fill(0);
+      if (tail->IsDspMpy64Inst()) {
+        // Update attributes of head inst that is dual issued with tail MPY64
+        // isnt. Later these attributes decide if MPYL can be bonded.
+        bondable_inst[0] = MpyBondingState(inst);
+      }
+    } else {
+      is_tail     = true;
+      inum        = 1;
+      dst1_stage_def[inum] = 0;
+=======
+  exu.Init(*inst, bpu.IsLoopBack(cpu.state, *inst));
+  if (exu.IsHead()) {
+    tail = inst->GetDualIssueTail();
+    // NOTE: BUNDLING LOGIC MUST NOT BUNDLE PIPELINE FLUSHING INSTRUCTIONS
+    ASSERT(!tail->IsPipelineFlushInst());
+    if (tail->IsDspMpy64Inst()) {
+      // Update attributes of head inst that is dual issued with tail MPY64
+      // inst. Later these attributes decide if MPYL can be bonded.
+      bondable_inst[0] = MpyBondingState(inst);
+>>>>>>> origin/develop
+
+
+
+
+
+
+
+
+
+/SCRATCH/nsim-rv/Tools/nsim/main/dev/unittests/vec/VectorFFMinMax.cpp
+2 CONFLICTS
+
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/develop
+
+<<<<<<< HEAD
+
+    ASSERT_FALSE(inst.Is(isa::arc::OpCode::VEC_INST));
+    inst.Decode(Dcode::Context(&inst, 0x0, kWordSize, CPU->state, CPU->isa_opts, CPU->reg, CPU->ext_mgr));
+    inst.Decode(Dcode::Context(&inst, 0x0, kWordSize, CPU->state, CPU->isa_opts, CPU->reg, CPU->ext_mgr));
+
+    ASSERT_TRUE(inst.Is(isa::arc::OpCode::VEC_INST));
+    ASSERT_TRUE(inst.IsVectorInst());
+    ASSERT_EQ(inst.GetVectorOpcode(), isa::arc::OpCode::kVecVFFMAX);
+    // TEST IF CORRECT VECTOR OPERANDS HAVE BEEN SELECTED
+    ASSERT_TRUE(inst.IsPredicated());
+
+    auto pr0 = CPU->reg.GetPred<E>(0);
+    std::fill(pr0.begin(), pr0.end(), false);
+    pr0[3] = true;
+    pr0[4] = true;
+    auto src1 = CPU->reg.GetVec<E>(inst.GetRegNum<kSrc1>());
+    for (uint32 I = 0, E = src1.GetDimension(); I != E; ++I) {
+      float f = (float)1.1f;
+      src1[I] = *(uint32*)&(f);
+    }
+
+=======
+
+    ASSERT_FALSE(inst.Is(isa::arc::OpCode::VEC_INST));
+    inst.Decode(Dcode::Context(&inst, 0x0, kWordSize, CPU->state, CPU->isa_opts, CPU->reg, CPU->ext_mgr));
+    inst.Decode(Dcode::Context(&inst, 0x0, kWordSize, CPU->state, CPU->isa_opts, CPU->reg, CPU->ext_mgr));
+
+    ASSERT_TRUE(inst.Is(isa::arc::OpCode::VEC_INST));
+    ASSERT_TRUE(inst.IsVectorInst());
+    ASSERT_EQ(inst.GetVectorOpcode(), isa::arc::OpCode::kVecVFFMAX);
+    // TEST IF CORRECT VECTOR OPERANDS HAVE BEEN SELECTED
+    ASSERT_TRUE(inst.IsPredicated());
+
+    auto pr0 = CPU->reg.GetPred<E>(0);
+    std::fill(pr0.begin(), pr0.end(), false);
+    pr0[3] = true;
+    pr0[4] = true;
+    auto src1 = CPU->reg.GetVec<E>(inst.GetRegNum<kSrc1>());
+    for (uint32 I = 0, E = src1.GetDimension(); I != E; ++I) {
+      float f = (float)1.1f;
+      src1[I] = *(uint32*)&(f);
+    }
+
+>>>>>>> origin/develop
+
+
+
+
+
+
+
+
+
+
+
